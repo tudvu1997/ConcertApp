@@ -1,0 +1,219 @@
+import json
+
+# Define constants for the seating chart
+ROWS = 20
+SEATS_PER_ROW = 26
+AVAILABLE = '.'
+OCCUPIED = 'X'
+EMPTY = 'e'
+
+# Define the filename for the data file
+DATA_FILE = 'data.json'
+
+# Define the seating chart as a 2D list of rows and columns
+seating_chart = [[AVAILABLE for _ in range(SEATS_PER_ROW)] for _ in range(ROWS)]
+
+# Load data from file, or create a new dictionary if the file doesn't exist
+try:
+    with open(DATA_FILE, 'r') as f:
+        data = json.load(f)
+except FileNotFoundError:
+    data = {'seating_chart': seating_chart, 'purchases': []}
+
+def print_seating_chart():
+    # Print the seating chart
+    print('\nSeating Chart:')
+    print('   ', end='')
+    for i in range(SEATS_PER_ROW):
+        print(f'{chr(i + 65)} ', end='')
+    print('    Type     Price')
+    for i, row in enumerate(data['seating_chart']):
+        row_num = str(i).zfill(2)
+        if i <= 4:
+            seat_type = 'Front Seat'
+            price = '$80'
+        elif i <= 10:
+            seat_type = 'Middle Seat'
+            price = '$50'
+        else:
+            seat_type = 'Back Seat'
+            price = '$25'
+        print(f'{row_num}: {" ".join(row)} {seat_type:<12} {price}')
+
+def calculate_ticket_cost(ticket_list):
+    subtotal = 0
+    for ticket in ticket_list:
+        row_num, seat_num = ticket.split('-')
+        if int(row_num) <= 4:
+            # Front seat
+            subtotal += 80
+        elif int(row_num) <= 10:
+            # Middle seat
+            subtotal += 50
+        else:
+            # Back seat
+            subtotal += 25
+
+    # Add tax and mask fee to subtotal
+    tax = 0.0725  # 7.25% tax
+    mask_fee = 5.00
+    total_cost = subtotal * (1 + tax) + mask_fee
+
+    return total_cost
+
+while True:
+    # Print the menu
+    print("""
+Welcome to the Outdoor Park Concert ticketing system!
+
+Please select an option from the menu below:
+V: View seating
+B: Buy a ticket
+S: Search for customer by name
+D: Display all purchases and total income
+Q: Quit
+""")
+    # Get user input for the menu option
+    option = input('Enter option: ').upper()
+
+    # View seating chart
+    if option == 'V':
+        print_seating_chart()
+
+    # Buy a ticket
+    elif option == 'B':
+        # Ask the user which tickets they want to buy
+        ticket_numbers = input('Enter the seat(s) you want to buy, separated by a comma (i.e. 00-A, 00-B, 00-C): ')
+
+        # Ask the user for their name and email
+        name = input('Enter your name: ')
+        email = input('Enter your email: ')
+
+        # Split the input into a list of ticket numbers
+        ticket_list = ticket_numbers.strip().upper().split(',')
+
+        # Check if the selected seats are already occupied
+        occupied_seats = []
+        for ticket in ticket_list:
+            row_num, seat_num = ticket.split('-')
+            if data['seating_chart'][int(row_num)][ord(seat_num) - 65] == OCCUPIED:
+                occupied_seats.append(ticket)
+
+        if occupied_seats:
+            # Display message if any of the selected seats are already occupied
+            print(f"Sorry, the following seat(s) have already been taken: {', '.join(occupied_seats)}")
+        else:
+            # Mark the selected seats as occupied and save the purchase
+            for ticket in ticket_list:
+                row_num, seat_num = ticket.split('-')
+                data['seating_chart'][int(row_num)][ord(seat_num) - 65] = OCCUPIED
+                data['purchases'].append({'ticket': ticket, 'name': name})
+
+            # Calculate the total cost of the tickets
+            subtotal = 0
+            num_tickets = len(ticket_list)
+            for ticket in ticket_list:
+                row_num, seat_num = ticket.split('-')
+                if int(row_num) <= 4:
+                    # Front seat
+                    subtotal += 80
+                elif int(row_num) <= 10:
+                    # Middle seat
+                    subtotal += 50
+                else:
+                    # Back seat
+                    subtotal += 25
+
+            # Add tax and mask fee to subtotal
+            tax_rate = 0.0725  # 7.25% tax
+            mask_fee = 5.00
+            tax = round(subtotal * tax_rate, 2)
+            total_cost = subtotal + tax + (num_tickets * mask_fee)
+
+            # Display a receipt
+            print('\nReceipt:')
+            print(f'Name: {name}')
+            print(f'Email: {email}')
+            print(f'Tickets: {num_tickets}')
+            print('Seats:')
+            for ticket in ticket_list:
+                print(f'- {ticket}')
+            print(f'Subtotal: ${subtotal:.2f}')
+            print(f'Tax: ${tax:.2f} ({tax_rate * 100:.2f}% of subtotal)')
+            print(f'Mask fee: ${num_tickets * mask_fee:.2f}')
+            print(f'Total: ${total_cost:.2f}')
+
+            # Display a success message with the total cost
+            print(f'Purchase successful! Your total is ${total_cost:.2f}')
+
+            # Save the updated data to file
+            with open(DATA_FILE, 'w') as f:
+                json.dump(data, f)
+
+    # View seating chart
+    elif option == 'V':
+        print_seating_chart()
+
+    # Search for customer by name
+    elif option == 'S':
+        # Ask the user for their name
+        name = input('What is your name? ')
+
+        # Search for the user's purchase history based on their name
+        purchases = []
+        for purchase in data['purchases']:
+            if purchase['name'] == name:
+                purchases.append(purchase['ticket'])
+
+        if purchases:
+            # Display the user's purchase history
+            print(f"Here are {name}'s purchased tickets:")
+            for ticket in purchases:
+                print(f"- {ticket}")
+        else:
+            print("Sorry, we couldn't find any ticket associated with that name!") 
+
+
+    # Display all purchases and total income
+    elif option == 'D':
+        print('All purchases:')
+        purchases = {}
+        total_income = 0
+        for purchase in data['purchases']:
+            name = purchase['name']
+            ticket = purchase['ticket']
+            if name in purchases:
+                purchases[name].append(ticket)
+            else:
+                purchases[name] = [ticket]
+            subtotal = 0
+            row_num, seat_num = ticket.split('-')
+            if int(row_num) <= 4:
+                # Front seat
+                subtotal += 80
+            elif int(row_num) <= 10:
+                # Middle seat
+                subtotal += 50
+            else:
+                # Back seat
+                subtotal += 25
+            tax_rate = 0.0725  # 7.25% tax
+            mask_fee = 5.00
+            tax = round(subtotal * tax_rate, 2)
+            total_cost = subtotal + tax + mask_fee
+            total_income += total_cost
+
+        for name, tickets in purchases.items():
+            print(f'{name}: {", ".join(tickets)}')
+        print(f'Total income: ${total_income:.2f}')
+
+    # Quit
+    elif option == 'Q':
+        # Save data to file before quitting
+        with open(DATA_FILE, 'w') as f:
+            json.dump(data, f)
+        break
+
+    # Invalid option
+    else:
+        print('Invalid option. Please try again.\n')
